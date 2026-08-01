@@ -24,6 +24,7 @@ import { useAdminSubscriptions } from '@/hooks/useAdminSubscriptions'
 import { useAdminPlans } from '@/hooks/useAdminPlans'
 import { approveSubscription, rejectSubscription, createPlan, updatePlan, deletePlan, getSubscriptionById } from '@/services/subscription.service'
 import { buildPlanPayload } from '@/api/payloads'
+import { scheduleSubscriptionExpiryNotifications } from '@/utils/subscriptionExpiryNotifications'
 
 export default function SubscriptionsPage() {
   const [filters, setFilters] = useState({ search: '', status: '', type: '', plan: '', dateFrom: '', dateTo: '' })
@@ -51,10 +52,13 @@ export default function SubscriptionsPage() {
   const plans = plansData || []
 
   const approveMutation = useMutation({
-    mutationFn: (id) => approveSubscription(id),
-    onSuccess: () => {
+    mutationFn: (sub) => approveSubscription(sub.id),
+    onSuccess: (_, sub) => {
       toast.success('Subscription approved successfully')
       queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] })
+      if (sub.endDate) {
+        scheduleSubscriptionExpiryNotifications(sub)
+      }
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Failed to approve subscription')
@@ -129,6 +133,8 @@ export default function SubscriptionsPage() {
         status: (d.status || '').toLowerCase(),
         startDate: fmtDate(d.startDate),
         expiryDate: fmtDate(d.endDate),
+        endDate: d.endDate,
+        seller: d.seller,
         amount: d.amount || 0,
         paymentScreenshot: d.paymentScreenshot || null,
         paymentDate: fmtDate(d.startDate),
@@ -163,7 +169,7 @@ export default function SubscriptionsPage() {
   }
 
   function handleApprove(approval) {
-    approveMutation.mutate(approval.id)
+    approveMutation.mutate(approval)
   }
 
   function handleReject(approval, reason) {

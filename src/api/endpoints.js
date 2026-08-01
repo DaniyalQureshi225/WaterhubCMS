@@ -35,6 +35,11 @@ export const ENDPOINTS = {
     UPDATE: (id) => `/advertisements/${id}`,
     DELETE: (id) => `/advertisements/${id}`,
   },
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    CREATE: '/notifications',
+    DELETE: (id) => `/notifications/${id}`,
+  },
   SETTINGS: {
     TRIAL_DURATION: '/settings/trial-duration',
   },

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import {
   Droplets, LayoutDashboard, Search, Bell, ChevronDown,
   Menu, LogOut, Settings, Users, ShoppingCart,
-  CreditCard, Shield
+  CreditCard, Shield, Megaphone
 } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import useAuthStore from '@/store/authStore'
@@ -16,6 +16,7 @@ const sidebarItems = [
   { name: 'Customers', icon: ShoppingCart, path: '/dashboard/customers' },
   { name: 'Subscriptions', icon: CreditCard, path: '/dashboard/subscriptions' },
   { name: 'Advertisements', icon: Shield, path: '/dashboard/advertisements' },
+  { name: 'Notifications', icon: Megaphone, path: '/dashboard/notifications' },
 ]
 
 export default function DashboardLayout({ children }) {
