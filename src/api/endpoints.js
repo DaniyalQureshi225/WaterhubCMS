@@ -43,4 +43,9 @@ export const ENDPOINTS = {
   SETTINGS: {
     TRIAL_DURATION: '/settings/trial-duration',
   },
+  CRASH_LOGS: {
+    LIST: '/crash-logs',
+    DETAILS: (id) => `/crash-logs/${id}`,
+    DELETE: (id) => `/crash-logs/${id}`,
+  },
 }

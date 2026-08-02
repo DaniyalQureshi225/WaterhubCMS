@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import {
   Droplets, LayoutDashboard, Search, Bell, ChevronDown,
   Menu, LogOut, Settings, Users, ShoppingCart,
-  CreditCard, Shield, Megaphone
+  CreditCard, Shield, Megaphone, Bug
 } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import useAuthStore from '@/store/authStore'
@@ -17,6 +17,7 @@ const sidebarItems = [
   { name: 'Subscriptions', icon: CreditCard, path: '/dashboard/subscriptions' },
   { name: 'Advertisements', icon: Shield, path: '/dashboard/advertisements' },
   { name: 'Notifications', icon: Megaphone, path: '/dashboard/notifications' },
+  { name: 'Crash Logs', icon: Bug, path: '/dashboard/crash-logs', adminOnly: true },
 ]
 
 export default function DashboardLayout({ children }) {
@@ -53,7 +54,9 @@ export default function DashboardLayout({ children }) {
 
         <div className="flex flex-col justify-between h-[calc(100%-70px)]">
           <nav className="p-3 space-y-0.5">
-            {sidebarItems.map(item => {
+            {sidebarItems
+              .filter(item => !item.adminOnly || user?.role === 'ADMIN')
+              .map(item => {
               const isActive = pathname === item.path
               return (
                 <button

@@ -14,6 +14,10 @@ const variants = {
   inactive: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   rejected: 'bg-rose-50 text-rose-700 ring-rose-600/20',
   cancelled: 'bg-slate-100 text-slate-600 ring-slate-500/20',
+  fatal: 'bg-red-50 text-red-700 ring-red-600/20',
+  nonfatal: 'bg-orange-50 text-orange-700 ring-orange-600/20',
+  warning: 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+  info: 'bg-blue-50 text-blue-700 ring-blue-600/20',
   default: 'bg-slate-50 text-slate-700 ring-slate-600/20',
 }
 

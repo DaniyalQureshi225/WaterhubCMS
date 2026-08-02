@@ -13,6 +13,14 @@ export function buildQueryString(params = {}) {
   if (params.plan) query.set('plan', params.plan)
   if (params.type) query.set('type', params.type)
   if (params.city) query.set('city', params.city)
+  if (params.sellerId) query.set('sellerId', params.sellerId)
+  if (params.sellerName) query.set('sellerName', params.sellerName)
+  if (params.company) query.set('company', params.company)
+  if (params.severity) query.set('severity', params.severity)
+  if (params.appVersion) query.set('appVersion', params.appVersion)
+  if (params.deviceModel) query.set('deviceModel', params.deviceModel)
+  if (params.sortBy) query.set('sortBy', params.sortBy)
+  if (params.sortOrder) query.set('sortOrder', params.sortOrder)
 
   const str = query.toString()
   return str ? `?${str}` : ''
