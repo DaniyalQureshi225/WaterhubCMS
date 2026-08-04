@@ -20,3 +20,8 @@ export async function refreshToken(refreshToken) {
   const { data } = await apiClient.post(ENDPOINTS.AUTH.REFRESH, { refreshToken })
   return data
 }
+
+export async function changePassword(payload) {
+  const { data } = await apiClient.patch(ENDPOINTS.AUTH.CHANGE_PASSWORD, payload)
+  return data
+}

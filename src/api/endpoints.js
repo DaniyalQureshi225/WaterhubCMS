@@ -4,6 +4,7 @@ export const ENDPOINTS = {
     LOGOUT: '/auth/logout',
     REFRESH: '/auth/refresh-token',
     ME: '/auth/me',
+    CHANGE_PASSWORD: '/auth/admin/change-password',
   },
   DASHBOARD: {
     HOME: '/dashboard/admin',

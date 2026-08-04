@@ -146,7 +146,10 @@ export default function DashboardLayout({ children }) {
                       <p className="text-sm font-medium text-slate-900">{_hydrated && user?.name ? user.name : 'Admin User'}</p>
                       <p className="text-xs text-slate-500">{_hydrated && user?.email ? user.email : 'admin@waterhub.com'}</p>
                     </div>
-                    <button className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                    <button
+                      onClick={() => { router.push('/dashboard/settings'); setProfileOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
                       <Settings size={16} className="text-slate-400" />
                       Settings
                     </button>
