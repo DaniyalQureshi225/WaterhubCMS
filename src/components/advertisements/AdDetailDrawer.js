@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Calendar, User, Target, Image } from 'lucide-react'
+import { X, Calendar, Target, Image, Loader2 } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import apiClient from '@/api/axios'
 
@@ -13,28 +13,55 @@ const statusVariant = {
   inactive: 'inactive',
 }
 
-export default function AdDetailDrawer({ ad, isOpen, onClose }) {
-  const [bannerBlob, setBannerBlob] = useState(null)
+function AdBanner({ imageUrl, title, className = '' }) {
+  const [blobUrl, setBlobUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
-    if (!ad?.image || !isOpen) {
-      setBannerBlob(null)
-      return
-    }
-
     let cancelled = false
 
-    apiClient.get(ad.image, { responseType: 'blob' })
-      .then(({ data }) => {
-        if (!cancelled) setBannerBlob(URL.createObjectURL(data))
-      })
-      .catch(() => {
-        if (!cancelled) setBannerBlob(null)
-      })
+    const loadImage = async () => {
+      if (!imageUrl) {
+        if (!cancelled) {
+          setLoading(false)
+          setError(true)
+        }
+        return
+      }
 
-    return () => { cancelled = true }
-  }, [ad?.image, isOpen])
+      try {
+        const { data } = await apiClient.get(imageUrl, { responseType: 'blob' })
+        if (!cancelled) {
+          setBlobUrl(URL.createObjectURL(data))
+          setLoading(false)
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true)
+          setLoading(false)
+        }
+      }
+    }
 
+    loadImage()
+
+    return () => {
+      cancelled = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [imageUrl])
+
+  return (
+    <div className={`w-full aspect-video rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden ${className}`}>
+      {loading && <Loader2 size={40} className="text-blue-400 animate-spin" />}
+      {error && <Image size={40} className="text-blue-400" />}
+      {blobUrl && <img src={blobUrl} alt={title} className="w-full h-full object-cover" />}
+    </div>
+  )
+}
+
+export default function AdDetailDrawer({ ad, isOpen, onClose }) {
   if (!isOpen || !ad) return null
 
   return (
@@ -49,13 +76,7 @@ export default function AdDetailDrawer({ ad, isOpen, onClose }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <div className="w-full aspect-video rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden">
-            {bannerBlob ? (
-              <img src={bannerBlob} alt={ad.title} className="w-full h-full object-cover" />
-            ) : (
-              <Image size={40} className="text-blue-400" />
-            )}
-          </div>
+          <AdBanner imageUrl={ad.image} title={ad.title} />
 
           <div>
             <div className="flex items-center gap-2 mb-1">

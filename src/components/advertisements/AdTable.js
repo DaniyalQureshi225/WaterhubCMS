@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, Edit3, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, Image } from 'lucide-react'
+import { Eye, Edit3, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, Image, Loader2 } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
+import apiClient from '@/api/axios'
 
 const statusVariant = {
   running: 'running',
@@ -45,21 +46,83 @@ function DropdownMenu({ buttonRef, ad, onClose, onView, onEdit, onDelete }) {
   )
 }
 
+function AdImage({ imageUrl, className = '' }) {
+  const [blobUrl, setBlobUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadImage = async () => {
+      if (!imageUrl) {
+        if (!cancelled) {
+          setLoading(false)
+          setError(true)
+        }
+        return
+      }
+
+      try {
+        const { data } = await apiClient.get(imageUrl, { responseType: 'blob' })
+        if (!cancelled) {
+          setBlobUrl(URL.createObjectURL(data))
+          setLoading(false)
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true)
+          setLoading(false)
+        }
+      }
+    }
+
+    loadImage()
+
+    return () => {
+      cancelled = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [imageUrl])
+
+  if (loading) {
+    return (
+      <div className={`w-12 h-8 rounded-md bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden ${className}`}>
+        <Loader2 size={16} className="text-blue-400 animate-spin" />
+      </div>
+    )
+  }
+
+  if (error || !blobUrl) {
+    return (
+      <div className={`w-12 h-8 rounded-md bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden ${className}`}>
+        <Image size={16} className="text-blue-400" />
+      </div>
+    )
+  }
+
+  return (
+    <div className={`w-12 h-8 rounded-md flex items-center justify-center overflow-hidden ${className}`}>
+      <img src={blobUrl} alt="" className="w-full h-full object-cover" />
+    </div>
+  )
+}
+
 export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, onView, onEdit, onDelete, page, totalPages, onPageChange, search }) {
   const [openMenu, setOpenMenu] = useState(null)
   const allSelected = ads.length > 0 && selected.length === ads.length
   const buttonRefs = useRef({})
 
-  function getButtonRef(id) {
+  const getButtonRef = useCallback((id) => {
     if (!buttonRefs.current[id]) buttonRefs.current[id] = { current: null }
     return buttonRefs.current[id]
-  }
+  }, [])
 
-  const filtered = ads.filter(a => {
-    if (!search) return true
+  const filtered = useMemo(() => {
+    if (!search) return ads
     const q = search.toLowerCase()
-    return a.title.toLowerCase().includes(q)
-  })
+    return ads.filter(a => a.title.toLowerCase().includes(q))
+  }, [ads, search])
 
   const activeAd = ads.find(a => a.id === openMenu)
 
@@ -71,7 +134,7 @@ export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, on
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
@@ -105,13 +168,7 @@ export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, on
                       />
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="w-12 h-8 rounded-md bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden">
-                        {ad.image ? (
-                          <img src={ad.image} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <Image size={16} className="text-blue-400" />
-                        )}
-                      </div>
+                      <AdImage imageUrl={ad.image} />
                     </td>
                     <td className="px-4 py-3.5">
                       <span className="text-sm font-medium text-slate-900">{ad.title}</span>
@@ -133,7 +190,7 @@ export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, on
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <button
-                        ref={el => { getButtonRef(ad.id).current = el }}
+                        ref={getButtonRef(ad.id)}
                         onClick={() => setOpenMenu(openMenu === ad.id ? null : ad.id)}
                         className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                       >
@@ -175,7 +232,7 @@ export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, on
 
       {activeAd && (
         <DropdownMenu
-          buttonRef={getButtonRef(activeAd.id)}
+          buttonRef={buttonRefs.current[activeAd.id]}
           ad={activeAd}
           onClose={() => setOpenMenu(null)}
           onView={onView}

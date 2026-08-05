@@ -1,33 +1,101 @@
 'use client'
 
+import { useMemo } from 'react'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { useSubscriptionAnalytics } from '@/hooks/useSubscriptionAnalytics'
 
-const growthData = [
-  { month: 'Jul', subs: 280 }, { month: 'Aug', subs: 310 }, { month: 'Sep', subs: 345 },
-  { month: 'Oct', subs: 370 }, { month: 'Nov', subs: 398 }, { month: 'Dec', subs: 422 },
-  { month: 'Jan', subs: 448 }, { month: 'Feb', subs: 465 }, { month: 'Mar', subs: 490 },
-  { month: 'Apr', subs: 510 }, { month: 'May', subs: 525 }, { month: 'Jun', subs: 536 },
-]
+function fmtMonth(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-US', { month: 'short', year: '2-digit' })
+}
 
-const donutData = [
-  { name: 'Monthly', value: 320, color: '#2563eb' },
-  { name: 'Annual', value: 186, color: '#7c3aed' },
-]
+export default function SubscriptionCharts({ subscriptions = [], plans = [] }) {
+  const analytics = useSubscriptionAnalytics(subscriptions, [], plans)
 
-const revenueData = [
-  { plan: 'Monthly Pro', revenue: 4800000 },
-  { plan: 'Annual Premium', revenue: 22320000 },
-  { plan: 'Trial', revenue: 0 },
-]
+  const growthData = useMemo(() => {
+    const monthlyMap = new Map()
+    const now = new Date()
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = d.toLocaleString('en-US', { month: 'short', year: '2-digit' })
+      monthlyMap.set(key, 0)
+    }
+    subscriptions.forEach(s => {
+      if (!s.startDate) return
+      const d = new Date(s.startDate)
+      if (isNaN(d.getTime())) return
+      const key = d.toLocaleString('en-US', { month: 'short', year: '2-digit' })
+      monthlyMap.set(key, (monthlyMap.get(key) || 0) + 1)
+    })
+    return Array.from(monthlyMap.entries()).map(([month, subs]) => ({ month, subs }))
+  }, [subscriptions])
 
-const conversionData = [
-  { month: 'Jul', rate: 58 }, { month: 'Aug', rate: 62 }, { month: 'Sep', rate: 60 },
-  { month: 'Oct', rate: 65 }, { month: 'Nov', rate: 68 }, { month: 'Dec', rate: 72 },
-  { month: 'Jan', rate: 70 }, { month: 'Feb', rate: 74 }, { month: 'Mar', rate: 76 },
-  { month: 'Apr', rate: 73 }, { month: 'May', rate: 78 }, { month: 'Jun', rate: 81 },
-]
+  const donutData = useMemo(() => {
+    const monthly = analytics.monthlySubscribers || 0
+    const annual = analytics.annualSubscribers || 0
+    return [
+      { name: 'Monthly', value: monthly, color: '#2563eb' },
+      { name: 'Annual', value: annual, color: '#7c3aed' },
+    ].filter(d => d.value > 0)
+  }, [analytics.monthlySubscribers, analytics.annualSubscribers])
 
-export default function SubscriptionCharts() {
+  const revenueData = useMemo(() => {
+    const monthly = analytics.monthlyRevenue || 0
+    const annual = analytics.annualRevenue || 0
+    return [
+      { plan: 'Monthly', revenue: monthly, color: '#2563eb' },
+      { plan: 'Annual', revenue: annual, color: '#7c3aed' },
+    ].filter(d => d.revenue > 0)
+  }, [analytics.monthlyRevenue, analytics.annualRevenue])
+
+  const conversionData = useMemo(() => {
+    const monthlyMap = new Map()
+    const now = new Date()
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = d.toLocaleString('en-US', { month: 'short', year: '2-digit' })
+      monthlyMap.set(key, { trials: 0, converted: 0 })
+    }
+    subscriptions.forEach(s => {
+      if (!s.startDate) return
+      const d = new Date(s.startDate)
+      if (isNaN(d.getTime())) return
+      const key = d.toLocaleString('en-US', { month: 'short', year: '2-digit' })
+      const entry = monthlyMap.get(key)
+      if (entry) {
+        if (s.plan === 'MONTHLY' || s.plan === 'ANNUAL') entry.converted++
+        else if (s.type === 'TRIAL') entry.trials++
+      }
+    })
+    return Array.from(monthlyMap.entries()).map(([month, { trials, converted }]) => ({
+      month,
+      rate: trials > 0 ? Math.round((converted / (trials + converted)) * 100) : 0,
+    }))
+  }, [subscriptions])
+
+  const hasData = subscriptions.length > 0
+
+  if (!hasData) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-center justify-center h-[280px]">
+          <p className="text-slate-500 text-center">No analytics available yet</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-center justify-center h-[280px]">
+          <p className="text-slate-500 text-center">No analytics available yet</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-center justify-center h-[280px]">
+          <p className="text-slate-500 text-center">No analytics available yet</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-center justify-center h-[280px]">
+          <p className="text-slate-500 text-center">No analytics available yet</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -69,7 +137,9 @@ export default function SubscriptionCharts() {
               <XAxis dataKey="plan" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => `Rs.${(v/1000000).toFixed(1)}M`} />
               <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px' }} formatter={v => [`Rs. ${v.toLocaleString()}`, 'Revenue']} />
-              <Bar dataKey="revenue" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                {revenueData.map((e, i) => <Cell key={i} fill={e.color} />)}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>

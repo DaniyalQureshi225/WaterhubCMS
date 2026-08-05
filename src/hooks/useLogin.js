@@ -13,16 +13,15 @@ export function useLogin() {
   return useMutation({
     mutationFn: login,
     onSuccess: (response) => {
+      console.log('[Auth] Login success:', response.data)
       const { user, accessToken, refreshToken } = response.data
       setAuth({ user, accessToken, refreshToken })
       toast.success('Login Successful')
       router.push('/dashboard')
     },
     onError: (error) => {
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.errors?.[0] ||
-        'Login failed. Please try again.'
+      console.log('[Auth] Login error:', error.response?.status, error.response?.data, error.message)
+      const message = error.userMessage || error.response?.data?.message || error.response?.data?.errors?.[0] || 'Login failed. Please try again.'
       toast.error(message)
     },
   })

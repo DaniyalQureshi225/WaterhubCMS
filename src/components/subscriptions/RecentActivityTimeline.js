@@ -1,6 +1,8 @@
 'use client'
 
+import { useMemo } from 'react'
 import { CheckCircle, XCircle, Clock, CreditCard, RotateCcw, UserPlus } from 'lucide-react'
+import { useSubscriptionActivity } from '@/hooks/useSubscriptionAnalytics'
 
 const iconMap = {
   approve: { icon: CheckCircle, color: 'text-emerald-600 bg-emerald-50' },
@@ -11,13 +13,23 @@ const iconMap = {
   trial: { icon: UserPlus, color: 'text-violet-600 bg-violet-50' },
 }
 
-export default function RecentActivityTimeline({ activities }) {
+export default function RecentActivityTimeline({ subscriptions = [], trialUsers = [] }) {
+  const activities = useSubscriptionActivity(subscriptions, trialUsers)
+
+  if (activities.length === 0) {
+    return (
+      <div className="p-8 text-center text-slate-500">
+        No recent subscription activity.
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-0">
       {activities.map((activity, idx) => {
         const style = iconMap[activity.type] || iconMap.approve
         return (
-          <div key={idx} className="flex gap-3.5 px-5 py-3.5 last:pb-4">
+          <div key={activity.id || idx} className="flex gap-3.5 px-5 py-3.5 last:pb-4">
             <div className="relative flex flex-col items-center">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${style.color}`}>
                 <style.icon size={15} />

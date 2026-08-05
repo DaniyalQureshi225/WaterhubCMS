@@ -4,20 +4,18 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   Droplets, LayoutDashboard, Search, Bell, ChevronDown,
-  Menu, LogOut, Settings, Users, ShoppingCart,
-  CreditCard, Shield, Megaphone, Bug
+  Menu, LogOut, Settings, CreditCard, Shield, Megaphone, Bug
 } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import useAuthStore from '@/store/authStore'
 
 const sidebarItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-  { name: 'Sellers', icon: Users, path: '/dashboard/sellers' },
-  { name: 'Customers', icon: ShoppingCart, path: '/dashboard/customers' },
   { name: 'Subscriptions', icon: CreditCard, path: '/dashboard/subscriptions' },
   { name: 'Advertisements', icon: Shield, path: '/dashboard/advertisements' },
   { name: 'Notifications', icon: Megaphone, path: '/dashboard/notifications' },
   { name: 'Crash Logs', icon: Bug, path: '/dashboard/crash-logs', adminOnly: true },
+  { name: 'Settings', icon: Settings, path: '/dashboard/settings' },
 ]
 
 export default function DashboardLayout({ children }) {
@@ -25,13 +23,33 @@ export default function DashboardLayout({ children }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
-  const { user, clearAuth, hydrate, _hydrated } = useAuthStore()
+  const { user, clearAuth, hydrate, _hydrated, isAuthenticated } = useAuthStore()
 
-  useEffect(() => { hydrate() }, [hydrate])
+  useEffect(() => {
+    hydrate()
+  }, [hydrate])
+
+  useEffect(() => {
+    if (_hydrated && !isAuthenticated) {
+      router.push('/')
+    }
+  }, [_hydrated, isAuthenticated, router])
 
   function handleLogout() {
     clearAuth()
     router.push('/')
+  }
+
+  if (!_hydrated) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
   }
 
   return (
@@ -130,10 +148,10 @@ export default function DashboardLayout({ children }) {
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center gap-2.5 p-1.5 pr-2.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                <Avatar name={_hydrated && user?.name ? user.name : 'Admin User'} size="sm" />
+                <Avatar name={user?.name ? user.name : 'Admin User'} size="sm" />
                 <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-slate-900 leading-tight">{_hydrated && user?.name ? user.name : 'Admin User'}</p>
-                  <p className="text-xs text-slate-500 leading-tight">{_hydrated && user?.email ? user.email : 'admin@waterhub.com'}</p>
+                  <p className="text-sm font-medium text-slate-900 leading-tight">{user?.name ? user.name : 'Admin User'}</p>
+                  <p className="text-xs text-slate-500 leading-tight">{user?.email ? user.email : 'admin@waterhub.com'}</p>
                 </div>
                 <ChevronDown size={15} className="text-slate-400 hidden sm:block" />
               </button>
@@ -143,8 +161,8 @@ export default function DashboardLayout({ children }) {
                   <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
                   <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl border border-slate-200 shadow-xl z-20 py-1.5">
                     <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-sm font-medium text-slate-900">{_hydrated && user?.name ? user.name : 'Admin User'}</p>
-                      <p className="text-xs text-slate-500">{_hydrated && user?.email ? user.email : 'admin@waterhub.com'}</p>
+                      <p className="text-sm font-medium text-slate-900">{user?.name ? user.name : 'Admin User'}</p>
+                      <p className="text-xs text-slate-500">{user?.email ? user.email : 'admin@waterhub.com'}</p>
                     </div>
                     <button
                       onClick={() => { router.push('/dashboard/settings'); setProfileOpen(false); }}

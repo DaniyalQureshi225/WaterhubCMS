@@ -1,17 +1,23 @@
 'use client'
 
-import { Info, Calendar, AlertTriangle, Ban, Clock, ShieldCheck } from 'lucide-react'
+import { useMemo } from 'react'
+import { Info, Calendar, AlertTriangle, Ban, Clock, ShieldCheck, Users, DollarSign, TrendingUp } from 'lucide-react'
+import { useSubscriptionAnalytics } from '@/hooks/useSubscriptionAnalytics'
 
-const rules = [
-  { icon: Info, color: 'text-blue-600 bg-blue-50', text: 'Every phone number receives a one-time 7-day free trial only.' },
-  { icon: Calendar, color: 'text-emerald-600 bg-emerald-50', text: 'Trial starts immediately after seller registration and cannot be restarted.' },
-  { icon: Ban, color: 'text-red-600 bg-red-50', text: 'Seller cannot use the Seller App after trial expires until subscription is approved.' },
-  { icon: Calendar, color: 'text-indigo-600 bg-indigo-50', text: 'Monthly subscriptions expire on the same calendar date of the next month (e.g. 15 Mar → 15 Apr, 31 Jan → 28 Feb).' },
-  { icon: ShieldCheck, color: 'text-violet-600 bg-violet-50', text: 'Annual subscriptions expire on the same calendar date next year (e.g. 10 Jun 2026 → 10 Jun 2027).' },
-  { icon: AlertTriangle, color: 'text-amber-600 bg-amber-50', text: '29 Feb expiry adjusts to 28 Feb on non-leap years.' },
-]
+export default function BusinessRules({ subscriptions = [], trialUsers = [], plans = [] }) {
+  const analytics = useSubscriptionAnalytics(subscriptions, trialUsers, plans)
 
-export default function BusinessRules() {
+  const rules = useMemo(() => [
+    { icon: Users, color: 'text-blue-600 bg-blue-50', text: `Trial Duration: ${analytics.trialDuration}` },
+    { icon: Calendar, color: 'text-emerald-600 bg-emerald-50', text: `Monthly Subscribers: ${analytics.monthlySubscribers}` },
+    { icon: Calendar, color: 'text-violet-600 bg-violet-50', text: `Annual Subscribers: ${analytics.annualSubscribers}` },
+    { icon: ShieldCheck, color: 'text-violet-600 bg-violet-50', text: `Active Plans: ${analytics.activePlans}` },
+    { icon: DollarSign, color: 'text-amber-600 bg-amber-50', text: `Avg Revenue/Subscriber: Rs. ${analytics.averageRevenuePerSubscriber.toLocaleString()}` },
+    { icon: TrendingUp, color: 'text-indigo-600 bg-indigo-50', text: `Avg Subscription Duration: ${analytics.averageSubscriptionDuration} days` },
+    { icon: Clock, color: 'text-red-600 bg-red-50', text: `Upcoming Renewals (7d): ${analytics.upcomingRenewals}` },
+    { icon: AlertTriangle, color: 'text-amber-600 bg-amber-50', text: `Upcoming Expirations (7d): ${analytics.upcomingExpirations}` },
+  ], [analytics])
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-4">

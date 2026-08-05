@@ -28,9 +28,14 @@ export default function ChangePasswordPage() {
   const [touched, setTouched] = useState({})
 
   const mutation = useMutation({
-    mutationFn: ({ currentPassword, newPassword, confirmPassword }) =>
-      changePassword({ currentPassword, newPassword, confirmPassword }),
+    mutationFn: async ({ currentPassword, newPassword, confirmPassword }) => {
+      console.log('[ChangePassword] Sending request:', { currentPassword: '***', newPassword: '***', confirmPassword: '***' })
+      const result = await changePassword({ currentPassword, newPassword, confirmPassword })
+      console.log('[ChangePassword] Response:', result)
+      return result
+    },
     onSuccess: () => {
+      console.log('[ChangePassword] Success')
       toast.success('Password changed successfully.')
       setCurrentPassword('')
       setNewPassword('')
@@ -40,6 +45,7 @@ export default function ChangePasswordPage() {
       router.push('/dashboard/settings')
     },
     onError: (err) => {
+      console.log('[ChangePassword] Error:', err.response?.status, err.response?.data, err.message)
       const message = err.response?.data?.message || 'Failed to change password. Please try again.'
       toast.error(message)
       if (err.response?.status === 401) {

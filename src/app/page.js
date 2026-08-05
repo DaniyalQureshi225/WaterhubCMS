@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Droplets, Eye, EyeOff } from 'lucide-react'
+import { Droplets, Eye, EyeOff, AlertCircle, WifiOff, RefreshCw } from 'lucide-react'
 import { useLogin } from '@/hooks/useLogin'
 import { loginPayload } from '@/api/payloads'
 
@@ -12,17 +12,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
 
   const loginMutation = useLogin()
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!email || !password) {
-      setError('Please enter email and password.')
       return
     }
-    setError('')
     loginMutation.mutate({ ...loginPayload, email, password })
   }
 
@@ -50,9 +47,10 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {error && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                  {error}
+              {loginMutation.isError && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+                  <AlertCircle size={16} className="flex-shrink-0" />
+                  <span>{loginMutation.error?.userMessage || loginMutation.error?.message || 'Login failed. Please try again.'}</span>
                 </div>
               )}
 
@@ -66,6 +64,7 @@ export default function LoginPage() {
                   onChange={e => setEmail(e.target.value)}
                   placeholder="admin@waterhub.com"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                  disabled={loginMutation.isPending}
                 />
               </div>
 
@@ -80,11 +79,13 @@ export default function LoginPage() {
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm pr-10"
+                    disabled={loginMutation.isPending}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    disabled={loginMutation.isPending}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -98,6 +99,7 @@ export default function LoginPage() {
                   checked={remember}
                   onChange={e => setRemember(e.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  disabled={loginMutation.isPending}
                 />
                 <label htmlFor="remember" className="ml-2 text-sm text-slate-600">
                   Remember me

@@ -2,8 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { getAdvertisements } from '@/services/advertisement.service'
-
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1$/, '')
+import { getImageUrl } from '@/api/imageUrl'
 
 function fmtDate(iso) {
   if (!iso) return ''
@@ -26,7 +25,7 @@ function normalizeAd(ad) {
     startDate: fmtDate(ad.startDate),
     endDate: fmtDate(ad.endDate),
     createdAt: fmtDate(ad.createdAt),
-    image: ad.bannerImage ? `${API_BASE}${ad.bannerImage}` : null,
+    image: ad.bannerImage ? getImageUrl(ad.bannerImage) : null,
     bannerImage: ad.bannerImage || null,
     priority: ad.priority || 'Medium',
   }
