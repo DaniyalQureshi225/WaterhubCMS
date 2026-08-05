@@ -36,18 +36,22 @@ export default function CrashDetailDrawer({ crashId, isOpen, onClose }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [prevKey, setPrevKey] = useState(null)
+
+  const key = isOpen && crashId ? crashId : null
+
+  if (key !== prevKey) {
+    setPrevKey(key)
+    setData(null)
+    setError('')
+    setLoading(!!key)
+  }
 
   useEffect(() => {
-    if (!crashId || !isOpen) {
-      setData(null)
-      setError('')
-      return
-    }
+    if (!key) return
     let cancelled = false
-    setLoading(true)
-    setError('')
 
-    getCrashLogById(crashId)
+    getCrashLogById(key)
       .then((res) => {
         if (!cancelled) setData(res.data || res)
       })
@@ -59,7 +63,7 @@ export default function CrashDetailDrawer({ crashId, isOpen, onClose }) {
       })
 
     return () => { cancelled = true }
-  }, [crashId, isOpen])
+  }, [key])
 
   if (!isOpen) return null
 

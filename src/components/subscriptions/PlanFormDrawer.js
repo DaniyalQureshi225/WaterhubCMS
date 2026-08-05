@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 
 const defaultFeatures = ['Order Management', 'Customer Tracking', 'Basic Analytics', 'Email Support']
@@ -19,7 +19,11 @@ export default function PlanFormDrawer({ isOpen, onClose, mutation, editPlan }) 
   const [features, setFeatures] = useState(defaultFeatures)
   const [errors, setErrors] = useState({})
 
-  useEffect(() => {
+  const formKey = isOpen ? (editPlan ? editPlan.id || editPlan._id || 'edit' : 'create') : null
+  const [prevFormKey, setPrevFormKey] = useState(formKey)
+
+  if (formKey !== prevFormKey) {
+    setPrevFormKey(formKey)
     if (editPlan) {
       setForm({
         name: editPlan.name || '',
@@ -35,7 +39,7 @@ export default function PlanFormDrawer({ isOpen, onClose, mutation, editPlan }) 
       setFeatures(defaultFeatures)
     }
     setErrors({})
-  }, [editPlan, isOpen])
+  }
 
   function handleChange(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))

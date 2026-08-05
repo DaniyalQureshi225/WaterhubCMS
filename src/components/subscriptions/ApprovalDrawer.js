@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Image, CheckCircle, XCircle } from 'lucide-react'
+import { X, Image as ImageIcon, CheckCircle, XCircle } from 'lucide-react'
 import apiClient from '@/api/axios'
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1$/, '')
@@ -11,21 +11,30 @@ export default function ApprovalDrawer({ approval, isOpen, onClose, onApprove, o
   const [showRejectInput, setShowRejectInput] = useState(false)
   const [screenshotBlob, setScreenshotBlob] = useState(null)
 
+  const shouldLoad = !!(isOpen && approval?.paymentScreenshot)
+  const [prevShouldLoad, setPrevShouldLoad] = useState(shouldLoad)
+
+  if (shouldLoad !== prevShouldLoad) {
+    setPrevShouldLoad(shouldLoad)
+    if (!shouldLoad) setScreenshotBlob(null)
+  }
+
   useEffect(() => {
-    if (!approval?.paymentScreenshot || !isOpen) {
-      setScreenshotBlob(null)
-      return
-    }
+    if (!shouldLoad) return
 
     const path = approval.paymentScreenshot.startsWith('http')
       ? approval.paymentScreenshot
       : `${API_BASE}${approval.paymentScreenshot}`
 
     let cancelled = false
+    let url = null
 
     apiClient.get(path, { responseType: 'blob' })
       .then(({ data }) => {
-        if (!cancelled) setScreenshotBlob(URL.createObjectURL(data))
+        if (!cancelled) {
+          url = URL.createObjectURL(data)
+          setScreenshotBlob(url)
+        }
       })
       .catch(() => {
         if (!cancelled) setScreenshotBlob(null)
@@ -33,9 +42,9 @@ export default function ApprovalDrawer({ approval, isOpen, onClose, onApprove, o
 
     return () => {
       cancelled = true
-      if (screenshotBlob) URL.revokeObjectURL(screenshotBlob)
+      if (url) URL.revokeObjectURL(url)
     }
-  }, [approval?.paymentScreenshot, isOpen])
+  }, [shouldLoad, approval])
 
   if (!isOpen) return null
 
@@ -80,7 +89,7 @@ export default function ApprovalDrawer({ approval, isOpen, onClose, onApprove, o
           ) : (
             <div className="w-full aspect-video rounded-xl bg-slate-100 flex items-center justify-center">
               <div className="flex flex-col items-center gap-2 text-slate-400">
-                <Image size={40} />
+                <ImageIcon size={40} />
                 <span className="text-sm">No payment screenshot</span>
               </div>
             </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Calendar, Target, Image, Loader2 } from 'lucide-react'
+import { X, Calendar, Target, Image as ImageIcon, Loader2 } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import apiClient from '@/api/axios'
 
@@ -20,6 +20,7 @@ function AdBanner({ imageUrl, title, className = '' }) {
 
   useEffect(() => {
     let cancelled = false
+    let url = null
 
     const loadImage = async () => {
       if (!imageUrl) {
@@ -33,7 +34,8 @@ function AdBanner({ imageUrl, title, className = '' }) {
       try {
         const { data } = await apiClient.get(imageUrl, { responseType: 'blob' })
         if (!cancelled) {
-          setBlobUrl(URL.createObjectURL(data))
+          url = URL.createObjectURL(data)
+          setBlobUrl(url)
           setLoading(false)
         }
       } catch {
@@ -48,14 +50,14 @@ function AdBanner({ imageUrl, title, className = '' }) {
 
     return () => {
       cancelled = true
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
+      if (url) URL.revokeObjectURL(url)
     }
   }, [imageUrl])
 
   return (
     <div className={`w-full aspect-video rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden ${className}`}>
       {loading && <Loader2 size={40} className="text-blue-400 animate-spin" />}
-      {error && <Image size={40} className="text-blue-400" />}
+      {error && <ImageIcon size={40} className="text-blue-400" />}
       {blobUrl && <img src={blobUrl} alt={title} className="w-full h-full object-cover" />}
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 
 function useDebouncedValue(value, delay = 400) {
@@ -38,9 +38,17 @@ export default function CrashFilterBar({ filters = {}, onChange, onClear }) {
   const dAppVersion = useDebouncedValue(appVersion)
   const dDeviceModel = useDebouncedValue(deviceModel)
 
+  const filtersRef = useRef(filters)
+  const onChangeRef = useRef(onChange)
+
   useEffect(() => {
-    onChange({
-      ...filters,
+    filtersRef.current = filters
+    onChangeRef.current = onChange
+  })
+
+  useEffect(() => {
+    onChangeRef.current({
+      ...filtersRef.current,
       search: dSearch || undefined,
       sellerName: dSellerName || undefined,
       company: dCompany || undefined,

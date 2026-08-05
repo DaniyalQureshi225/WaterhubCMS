@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   Droplets, LayoutDashboard, Search, Bell, ChevronDown,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import useAuthStore from '@/store/authStore'
+import { ProactiveTokenRefresher } from '@/hooks/useProactiveTokenRefresh'
 
 const sidebarItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -25,21 +26,37 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname()
   const { user, clearAuth, hydrate, _hydrated, isAuthenticated } = useAuthStore()
 
+  // Hydrate on mount
   useEffect(() => {
     hydrate()
   }, [hydrate])
 
+  // Handle auth state changes - redirect if not authenticated after hydration
   useEffect(() => {
     if (_hydrated && !isAuthenticated) {
+      console.log('[DashboardLayout] Not authenticated, redirecting to login')
       router.push('/')
     }
   }, [_hydrated, isAuthenticated, router])
 
-  function handleLogout() {
+  // Handle focus events to re-check auth state
+  useEffect(() => {
+    const handleFocus = () => {
+      if (_hydrated && !isAuthenticated) {
+        console.log('[DashboardLayout] Focus detected, re-checking auth')
+        hydrate()
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [_hydrated, isAuthenticated, hydrate])
+
+  const handleLogout = useCallback(() => {
     clearAuth()
     router.push('/')
-  }
+  }, [clearAuth, router])
 
+  // Show loading while hydrating
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -48,6 +65,7 @@ export default function DashboardLayout({ children }) {
     )
   }
 
+  // If not authenticated after hydration, show nothing (redirect handled by useEffect)
   if (!isAuthenticated) {
     return null
   }
@@ -190,6 +208,7 @@ export default function DashboardLayout({ children }) {
         <div className="max-w-[1600px] mx-auto p-6">
           {children}
         </div>
+        <ProactiveTokenRefresher />
       </main>
     </div>
   )

@@ -3,6 +3,7 @@ import { STORAGE_KEYS } from '@/constants/storage'
 
 let isRefreshing = false
 let failedQueue = []
+let refreshTimeoutId = null
 
 function getAccessToken() {
   if (typeof window === 'undefined') return null
@@ -56,8 +57,16 @@ async function attemptTokenRefresh() {
     throw new Error('No refresh token available')
   }
 
+  // Create a separate axios instance for refresh to avoid interceptor loops
+  const { default: axios } = await import('axios')
+  const refreshClient = axios.create({
+    baseURL: process.env.NEXT_PUBLIC_API_URL || '',
+    timeout: 15000,
+    headers: { 'Content-Type': 'application/json' },
+  })
+
   try {
-    const response = await apiClient.post('/auth/refresh-token', { refreshToken })
+    const response = await refreshClient.post('/auth/refresh-token', { refreshToken })
     const { accessToken, refreshToken: newRefreshToken } = response.data
 
     if (typeof window !== 'undefined') {
@@ -91,12 +100,20 @@ export function setupInterceptors() {
     async (error) => {
       const originalRequest = error.config
 
+      // Don't retry auth endpoints
+      if (originalRequest.url?.includes('/auth/')) {
+        return Promise.reject(normalizeError(error))
+      }
+
+      // Handle network errors - don't logout, just reject with normalized error
       if (isNetworkError(error)) {
         console.log('[Auth] Network error detected, not logging out:', error.message)
         return Promise.reject(normalizeError(error))
       }
 
+      // Handle 401 - token expired, try to refresh
       if (error.response?.status === 401 && !originalRequest._retry) {
+        // If already refreshing, queue this request
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject })
@@ -117,9 +134,11 @@ export function setupInterceptors() {
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
           return apiClient(originalRequest)
         } catch (refreshError) {
+          // Refresh failed - clear storage but DON'T redirect automatically
+          // Let the query fail naturally so React Query can handle it
           processQueue(refreshError, null)
           clearStorage()
-          redirectToLogin()
+          // Don't redirect here - let the app handle auth state
           return Promise.reject(normalizeError(refreshError))
         } finally {
           isRefreshing = false

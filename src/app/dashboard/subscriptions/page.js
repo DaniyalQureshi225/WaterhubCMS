@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Plus, Settings, ChevronRight, TrendingUp, RefreshCw } from 'lucide-react'
 import { Card, CardHeader, CardContent } from '@/components/ui/Card'
-import { recentActivity } from '@/components/subscriptions/data'
 import SubStatsCards from '@/components/subscriptions/SubStatsCards'
 import SubFilterBar from '@/components/subscriptions/SubFilterBar'
 import SubPlans from '@/components/subscriptions/SubPlans'
@@ -22,6 +21,7 @@ import PlanFormDrawer from '@/components/subscriptions/PlanFormDrawer'
 import TrialSettingsModal from '@/components/subscriptions/TrialSettingsModal'
 import { useAdminSubscriptions } from '@/hooks/useAdminSubscriptions'
 import { useAdminPlans } from '@/hooks/useAdminPlans'
+import { useSubscriptionAnalytics } from '@/hooks/useSubscriptionAnalytics'
 import { approveSubscription, rejectSubscription, createPlan, updatePlan, deletePlan, getSubscriptionById } from '@/services/subscription.service'
 import { buildPlanPayload } from '@/api/payloads'
 import { scheduleSubscriptionExpiryNotifications } from '@/utils/subscriptionExpiryNotifications'
@@ -144,19 +144,27 @@ export default function SubscriptionsPage() {
     },
   })
 
-  const subscriptions = data?.subscriptions || []
-  const pendingApprovals = data?.pendingApprovals || []
-  const trialUsers = data?.trialUsers || []
+  const subscriptions = useMemo(() => data?.subscriptions || [], [data])
+  const pendingApprovals = useMemo(() => data?.pendingApprovals || [], [data])
+  const trialUsers = useMemo(() => data?.trialUsers || [], [data])
   const meta = data?.meta || {}
 
+  const analytics = useSubscriptionAnalytics(subscriptions, trialUsers, plans)
+
   const stats = useMemo(() => ({
-    activeSubscriptions: subscriptions.filter(s => s.status === 'active').length,
-    trialUsers: trialUsers.filter(t => t.status !== 'expired').length,
-    expiredSubscriptions: subscriptions.filter(s => s.status === 'expired').length,
+    activeSubscriptions: analytics.totalActiveSubscriptions,
+    trialUsers: analytics.trialUsers,
+    expiredSubscriptions: analytics.expiredSubscriptions,
     pendingApprovals: pendingApprovals.length,
-    monthlySubscribers: subscriptions.filter(s => s.plan === 'MONTHLY').length,
-    annualSubscribers: subscriptions.filter(s => s.plan === 'ANNUAL').length,
-  }), [subscriptions, pendingApprovals, trialUsers])
+    monthlySubscribers: analytics.monthlySubscribers,
+    annualSubscribers: analytics.annualSubscribers,
+    monthlyRevenue: analytics.monthlyRevenue,
+    annualRevenue: analytics.annualRevenue,
+    totalRevenue: analytics.totalRevenue,
+    expiringSoon: analytics.expiringSoon,
+    paidUsers: analytics.paidUsers,
+    trialConversionRate: analytics.trialConversionRate,
+  }), [analytics, pendingApprovals])
 
   function handleFilterChange(key, value) {
     setFilters(prev => ({ ...prev, [key]: value }))
@@ -317,7 +325,7 @@ export default function SubscriptionsPage() {
             </CardContent>
           </Card>
 
-          <BusinessRules />
+          <BusinessRules subscriptions={subscriptions} trialUsers={trialUsers} plans={plans} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2">
@@ -325,7 +333,7 @@ export default function SubscriptionsPage() {
                 <h3 className="text-base font-semibold text-slate-900">Analytics</h3>
               </CardHeader>
               <CardContent>
-                <SubscriptionCharts />
+                <SubscriptionCharts subscriptions={subscriptions} plans={plans} />
               </CardContent>
             </Card>
 
@@ -337,7 +345,7 @@ export default function SubscriptionsPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <RecentActivityTimeline activities={recentActivity} />
+                <RecentActivityTimeline subscriptions={subscriptions} trialUsers={trialUsers} />
               </CardContent>
             </Card>
           </div>

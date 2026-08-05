@@ -18,25 +18,37 @@ const statusVariant = {
 export default function NotificationDetailDrawer({ notification, isOpen, onClose }) {
   const [imgBlob, setImgBlob] = useState(null)
 
+  const shouldLoad = !!(isOpen && notification?.image)
+  const [prevShouldLoad, setPrevShouldLoad] = useState(shouldLoad)
+
+  if (shouldLoad !== prevShouldLoad) {
+    setPrevShouldLoad(shouldLoad)
+    if (!shouldLoad) setImgBlob(null)
+  }
+
   useEffect(() => {
-    if (!notification?.image || !isOpen) {
-      setImgBlob(null)
-      return
-    }
+    if (!shouldLoad) return
 
     const url = notification.image.startsWith('http') ? notification.image : `${API_BASE}${notification.image}`
     let cancelled = false
+    let blobUrl = null
 
     apiClient.get(url, { responseType: 'blob' })
       .then(({ data }) => {
-        if (!cancelled) setImgBlob(URL.createObjectURL(data))
+        if (!cancelled) {
+          blobUrl = URL.createObjectURL(data)
+          setImgBlob(blobUrl)
+        }
       })
       .catch(() => {
         if (!cancelled) setImgBlob(null)
       })
 
-    return () => { cancelled = true }
-  }, [notification?.image, isOpen])
+    return () => {
+      cancelled = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [shouldLoad, notification])
 
   if (!isOpen || !notification) return null
 

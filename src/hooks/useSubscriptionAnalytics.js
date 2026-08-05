@@ -114,6 +114,7 @@ export function useSubscriptionAnalytics(subscriptions = [], trialUsers = [], pl
 export function useSubscriptionActivity(subscriptions = [], trialUsers = []) {
   const activities = useMemo(() => {
     const acts = []
+    const now = new Date()
 
     subscriptions.forEach(s => {
       if (!s.id) return
@@ -143,7 +144,7 @@ export function useSubscriptionActivity(subscriptions = [], trialUsers = []) {
             time: createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             timestamp: createdDate.getTime(),
           })
-        } else if (endDate && endDate > new Date() && daysBetween(new Date(), endDate) <= 7) {
+        } else if (endDate && endDate > now && daysBetween(now, endDate) <= 7) {
           acts.push({
             type: 'renew',
             action: `${s.sellerName || 'A seller'} renewed ${s.plan} Plan`,
@@ -174,7 +175,7 @@ export function useSubscriptionActivity(subscriptions = [], trialUsers = []) {
       }
 
       if (t.status !== 'expired' && startDate && createdDate) {
-        const isNew = (new Date().getTime() - createdDate.getTime()) < 30 * 24 * 60 * 60 * 1000
+        const isNew = (now.getTime() - createdDate.getTime()) < 30 * 24 * 60 * 60 * 1000
         if (isNew) {
           acts.push({
             type: 'trial',
@@ -188,7 +189,6 @@ export function useSubscriptionActivity(subscriptions = [], trialUsers = []) {
       }
     })
 
-    const now = new Date()
     return acts
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10)

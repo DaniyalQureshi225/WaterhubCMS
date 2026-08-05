@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Eye, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
@@ -24,15 +24,7 @@ function SortableTh({ label, column, sortBy, sortOrder, onSort }) {
   )
 }
 
-function DropdownMenu({ buttonRef, crash, onClose, onView, onDelete }) {
-  const [pos, setPos] = useState({ top: 0, right: 0 })
-
-  useEffect(() => {
-    if (!buttonRef.current) return
-    const rect = buttonRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-  }, [buttonRef])
-
+function DropdownMenu({ pos, crash, onClose, onView, onDelete }) {
   return createPortal(
     <>
       <div className="fixed inset-0 z-[999]" onClick={onClose} />
@@ -58,11 +50,12 @@ export default function CrashLogsTable({
   isLoading, sortBy, sortOrder, onSort,
 }) {
   const [openMenu, setOpenMenu] = useState(null)
-  const buttonRefs = useRef({})
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
 
-  function getButtonRef(id) {
-    if (!buttonRefs.current[id]) buttonRefs.current[id] = { current: null }
-    return buttonRefs.current[id]
+  const handleOpenMenu = (e, id) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    setOpenMenu(openMenu === id ? null : id)
   }
 
   const activeCrash = crashes.find(c => c.id === openMenu)
@@ -134,8 +127,7 @@ export default function CrashLogsTable({
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <button
-                        ref={el => { getButtonRef(c.id).current = el }}
-                        onClick={() => setOpenMenu(openMenu === c.id ? null : c.id)}
+                        onClick={(e) => handleOpenMenu(e, c.id)}
                         className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                       >
                         <MoreHorizontal size={16} />
@@ -176,7 +168,7 @@ export default function CrashLogsTable({
 
       {activeCrash && (
         <DropdownMenu
-          buttonRef={getButtonRef(activeCrash.id)}
+          pos={menuPos}
           crash={activeCrash}
           onClose={() => setOpenMenu(null)}
           onView={onView}

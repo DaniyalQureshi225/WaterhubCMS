@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Upload, Smartphone, Store, AlertCircle, Image } from 'lucide-react'
+import { X, Upload, Smartphone, Store, AlertCircle, Image as ImageIcon } from 'lucide-react'
 
 const initialForm = {
   title: '',
@@ -27,7 +27,11 @@ export default function CreateAdDrawer({ isOpen, onClose, mutation, editAd }) {
   const fileRef = useRef(null)
   const fileObjectRef = useRef(null)
 
-  useEffect(() => {
+  const formKey = isOpen ? (editAd ? editAd.id || editAd._id || 'edit' : 'create') : null
+  const [prevFormKey, setPrevFormKey] = useState(formKey)
+
+  if (formKey !== prevFormKey) {
+    setPrevFormKey(formKey)
     if (editAd) {
       setForm({
         title: editAd.title || '',
@@ -43,14 +47,18 @@ export default function CreateAdDrawer({ isOpen, onClose, mutation, editAd }) {
         endTime: '',
       })
       setImagePreview(editAd.image || null)
-      fileObjectRef.current = null
+      setPreviewApp('Seller App')
     } else {
       setForm(initialForm)
       setImagePreview(null)
-      fileObjectRef.current = null
+      setPreviewApp('Seller App')
     }
     setErrors({})
-  }, [editAd, isOpen])
+  }
+
+  useEffect(() => {
+    fileObjectRef.current = null
+  }, [formKey])
 
   function handleChange(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -343,7 +351,7 @@ export default function CreateAdDrawer({ isOpen, onClose, mutation, editAd }) {
                         </div>
                       ) : (
                         <div className="aspect-[16/9] bg-slate-100 flex flex-col items-center justify-center gap-2">
-                          <Image size={24} className="text-slate-300" />
+                          <ImageIcon size={24} className="text-slate-300" />
                           <p className="text-[10px] text-slate-400">Banner preview</p>
                         </div>
                       )}

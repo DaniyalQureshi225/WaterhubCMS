@@ -1,19 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, Check, X, Download, Image, MoreHorizontal } from 'lucide-react'
+import { Eye, Check, X, Download, Image as ImageIcon, MoreHorizontal } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 
-function DropdownMenu({ buttonRef, approval, openMenu, onClose, onView, onApprove, onReject }) {
-  const [pos, setPos] = useState({ top: 0, right: 0 })
-
-  useEffect(() => {
-    if (!buttonRef.current) return
-    const rect = buttonRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-  }, [buttonRef])
-
+function DropdownMenu({ pos, approval, onClose, onView, onApprove, onReject }) {
   return createPortal(
     <>
       <div className="fixed inset-0 z-[999]" onClick={onClose} />
@@ -43,11 +35,12 @@ function DropdownMenu({ buttonRef, approval, openMenu, onClose, onView, onApprov
 
 export default function PendingApprovalsTable({ approvals = [], onView, onApprove, onReject }) {
   const [openMenu, setOpenMenu] = useState(null)
-  const buttonRefs = useRef({})
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
 
-  function getButtonRef(id) {
-    if (!buttonRefs.current[id]) buttonRefs.current[id] = { current: null }
-    return buttonRefs.current[id]
+  const handleOpenMenu = (e, id) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    setOpenMenu(openMenu === id ? null : id)
   }
 
   const activeApproval = approvals.find(a => a.id === openMenu)
@@ -79,7 +72,7 @@ export default function PendingApprovalsTable({ approvals = [], onView, onApprov
               <tr key={a.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3">
                   <div className="w-12 h-14 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden">
-                    <Image size={18} className="text-slate-400" />
+                    <ImageIcon size={18} className="text-slate-400" />
                   </div>
                 </td>
                 <td className="px-4 py-3">
@@ -105,8 +98,7 @@ export default function PendingApprovalsTable({ approvals = [], onView, onApprov
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button
-                    ref={el => { getButtonRef(a.id).current = el }}
-                    onClick={() => setOpenMenu(openMenu === a.id ? null : a.id)}
+                    onClick={(e) => handleOpenMenu(e, a.id)}
                     className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                   >
                     <MoreHorizontal size={16} />
@@ -120,9 +112,8 @@ export default function PendingApprovalsTable({ approvals = [], onView, onApprov
 
       {activeApproval && (
         <DropdownMenu
-          buttonRef={getButtonRef(activeApproval.id)}
+          pos={menuPos}
           approval={activeApproval}
-          openMenu={openMenu}
           onClose={() => setOpenMenu(null)}
           onView={onView}
           onApprove={onApprove}

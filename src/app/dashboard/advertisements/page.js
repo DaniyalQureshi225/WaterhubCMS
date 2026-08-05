@@ -34,7 +34,7 @@ export default function AdvertisementsPage() {
 
   const { data, isLoading, isError } = useAdminAdvertisements(apiParams)
   const queryClient = useQueryClient()
-  const ads = data?.ads || []
+  const ads = useMemo(() => data?.ads || [], [data])
 
   const createMutation = useMutation({
     mutationFn: (formData) => createAdvertisement(formData),

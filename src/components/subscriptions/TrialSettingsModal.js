@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X, Clock } from 'lucide-react'
 import { useTrialDuration, useUpdateTrialDuration } from '@/hooks/useTrialDuration'
 import toast from 'react-hot-toast'
@@ -11,12 +11,16 @@ export default function TrialSettingsModal({ isOpen, onClose }) {
   const [trialDays, setTrialDays] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (isOpen && currentDays != null) {
-      setTrialDays(currentDays.toString())
+  const [prevKey, setPrevKey] = useState(null)
+  const key = isOpen && currentDays != null ? String(currentDays) : null
+
+  if (key !== prevKey) {
+    setPrevKey(key)
+    if (key != null) {
+      setTrialDays(key)
       setError('')
     }
-  }, [isOpen, currentDays])
+  }
 
   function validate() {
     const num = Number(trialDays)

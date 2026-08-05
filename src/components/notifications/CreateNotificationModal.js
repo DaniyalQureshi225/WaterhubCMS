@@ -25,7 +25,10 @@ export default function CreateNotificationModal({ isOpen, onClose, mutation }) {
   const fileRef = useRef(null)
   const dropdownRef = useRef(null)
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
     if (!isOpen) {
       setForm(initialForm)
       setImageFile(null)
@@ -36,13 +39,18 @@ export default function CreateNotificationModal({ isOpen, onClose, mutation }) {
       setSelectedUser(null)
       setShowUserDropdown(false)
     }
-  }, [isOpen])
+  }
+
+  const searchActive = !!userSearch.trim() && form.audience === 'SPECIFIC_USER'
+  const [prevSearchActive, setPrevSearchActive] = useState(searchActive)
+
+  if (searchActive !== prevSearchActive) {
+    setPrevSearchActive(searchActive)
+    if (!searchActive) setSearchResults([])
+  }
 
   useEffect(() => {
-    if (!userSearch.trim() || form.audience !== 'SPECIFIC_USER') {
-      setSearchResults([])
-      return
-    }
+    if (!searchActive) return
     const debounce = setTimeout(() => {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/sellers?search=${encodeURIComponent(userSearch)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('wh_access_token') || ''}` },
@@ -60,7 +68,7 @@ export default function CreateNotificationModal({ isOpen, onClose, mutation }) {
         .catch(() => setSearchResults([]))
     }, 400)
     return () => clearTimeout(debounce)
-  }, [userSearch, form.audience])
+  }, [userSearch, form.audience, searchActive])
 
   function handleChange(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))

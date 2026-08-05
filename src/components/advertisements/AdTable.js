@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, Edit3, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, Image, Loader2 } from 'lucide-react'
+import { Eye, Edit3, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2 } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import apiClient from '@/api/axios'
 
@@ -14,15 +14,7 @@ const statusVariant = {
   inactive: 'inactive',
 }
 
-function DropdownMenu({ buttonRef, ad, onClose, onView, onEdit, onDelete }) {
-  const [pos, setPos] = useState({ top: 0, right: 0 })
-
-  useEffect(() => {
-    if (!buttonRef.current) return
-    const rect = buttonRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-  }, [buttonRef])
-
+function DropdownMenu({ pos, ad, onClose, onView, onEdit, onDelete }) {
   return createPortal(
     <>
       <div className="fixed inset-0 z-[999]" onClick={onClose} />
@@ -53,6 +45,7 @@ function AdImage({ imageUrl, className = '' }) {
 
   useEffect(() => {
     let cancelled = false
+    let url = null
 
     const loadImage = async () => {
       if (!imageUrl) {
@@ -66,7 +59,8 @@ function AdImage({ imageUrl, className = '' }) {
       try {
         const { data } = await apiClient.get(imageUrl, { responseType: 'blob' })
         if (!cancelled) {
-          setBlobUrl(URL.createObjectURL(data))
+          url = URL.createObjectURL(data)
+          setBlobUrl(url)
           setLoading(false)
         }
       } catch {
@@ -81,7 +75,7 @@ function AdImage({ imageUrl, className = '' }) {
 
     return () => {
       cancelled = true
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
+      if (url) URL.revokeObjectURL(url)
     }
   }, [imageUrl])
 
@@ -96,7 +90,7 @@ function AdImage({ imageUrl, className = '' }) {
   if (error || !blobUrl) {
     return (
       <div className={`w-12 h-8 rounded-md bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden ${className}`}>
-        <Image size={16} className="text-blue-400" />
+        <ImageIcon size={16} className="text-blue-400" />
       </div>
     )
   }
@@ -110,13 +104,14 @@ function AdImage({ imageUrl, className = '' }) {
 
 export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, onView, onEdit, onDelete, page, totalPages, onPageChange, search }) {
   const [openMenu, setOpenMenu] = useState(null)
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
   const allSelected = ads.length > 0 && selected.length === ads.length
-  const buttonRefs = useRef({})
 
-  const getButtonRef = useCallback((id) => {
-    if (!buttonRefs.current[id]) buttonRefs.current[id] = { current: null }
-    return buttonRefs.current[id]
-  }, [])
+  const handleOpenMenu = useCallback((e, id) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    setOpenMenu(openMenu === id ? null : id)
+  }, [openMenu])
 
   const filtered = useMemo(() => {
     if (!search) return ads
@@ -190,8 +185,7 @@ export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, on
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <button
-                        ref={getButtonRef(ad.id)}
-                        onClick={() => setOpenMenu(openMenu === ad.id ? null : ad.id)}
+                        onClick={(e) => handleOpenMenu(e, ad.id)}
                         className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                       >
                         <MoreHorizontal size={16} />
@@ -232,7 +226,7 @@ export default function AdTable({ ads, selected, onToggleSelect, onSelectAll, on
 
       {activeAd && (
         <DropdownMenu
-          buttonRef={buttonRefs.current[activeAd.id]}
+          pos={menuPos}
           ad={activeAd}
           onClose={() => setOpenMenu(null)}
           onView={onView}

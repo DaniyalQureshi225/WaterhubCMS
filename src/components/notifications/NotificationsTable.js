@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Eye, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
@@ -13,15 +13,7 @@ const statusVariant = {
   cancelled: 'inactive',
 }
 
-function DropdownMenu({ buttonRef, notification, onClose, onView, onDelete }) {
-  const [pos, setPos] = useState({ top: 0, right: 0 })
-
-  useEffect(() => {
-    if (!buttonRef.current) return
-    const rect = buttonRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-  }, [buttonRef])
-
+function DropdownMenu({ pos, notification, onClose, onView, onDelete }) {
   return createPortal(
     <>
       <div className="fixed inset-0 z-[999]" onClick={onClose} />
@@ -44,11 +36,12 @@ function DropdownMenu({ buttonRef, notification, onClose, onView, onDelete }) {
 
 export default function NotificationsTable({ notifications, meta, page, totalPages, onPageChange, onView, onDelete, onRefresh, isLoading }) {
   const [openMenu, setOpenMenu] = useState(null)
-  const buttonRefs = useRef({})
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
 
-  function getButtonRef(id) {
-    if (!buttonRefs.current[id]) buttonRefs.current[id] = { current: null }
-    return buttonRefs.current[id]
+  const handleOpenMenu = (e, id) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    setOpenMenu(openMenu === id ? null : id)
   }
 
   const activeNotification = notifications.find(n => n.id === openMenu)
@@ -120,8 +113,7 @@ export default function NotificationsTable({ notifications, meta, page, totalPag
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <button
-                        ref={el => { getButtonRef(n.id).current = el }}
-                        onClick={() => setOpenMenu(openMenu === n.id ? null : n.id)}
+                        onClick={(e) => handleOpenMenu(e, n.id)}
                         className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                       >
                         <MoreHorizontal size={16} />
@@ -162,7 +154,7 @@ export default function NotificationsTable({ notifications, meta, page, totalPag
 
       {activeNotification && (
         <DropdownMenu
-          buttonRef={getButtonRef(activeNotification.id)}
+          pos={menuPos}
           notification={activeNotification}
           onClose={() => setOpenMenu(null)}
           onView={onView}
