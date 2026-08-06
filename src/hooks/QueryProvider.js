@@ -20,16 +20,22 @@ export default function QueryProvider({ children }) {
             staleTime: 5 * 60 * 1000,
             // Keep unused queries in cache for 10 minutes
             gcTime: 10 * 60 * 1000,
-            // Retry failed queries up to 3 times
-            retry: 3,
+            // Stop retrying immediately for genuine auth failures
+            // Retry transient failures (network/server) a few times
+            retry: (failureCount, error) => {
+              if (error?.isAuthError) return false
+              if (error?.isNetworkError) return failureCount < 3
+              return failureCount < 2
+            },
             // Retry with exponential backoff
             retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
             // Don't refetch if the query is disabled
             enabled: true,
           },
           mutations: {
-            // Retry mutations on network error
+            // Retry mutations on network error only
             retry: (failureCount, error) => {
+              if (error?.isAuthError) return false
               if (error?.isNetworkError) return failureCount < 3
               return false
             },
@@ -43,7 +49,7 @@ export default function QueryProvider({ children }) {
     setupInterceptors()
   }, [])
 
-  // Add focus/reconnect listener for additional robustness
+  // Add focus/reconnect/visibility listener for additional robustness
   useEffect(() => {
     const handleFocus = () => {
       console.log('[QueryClient] Window focused - refetching active queries')
@@ -55,12 +61,21 @@ export default function QueryProvider({ children }) {
       queryClient.refetchQueries({ stale: true })
     }
 
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[QueryClient] Tab visible - refetching active queries')
+        queryClient.refetchQueries({ stale: true })
+      }
+    }
+
     window.addEventListener('focus', handleFocus)
     window.addEventListener('online', handleOnline)
+    document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('online', handleOnline)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [queryClient])
 

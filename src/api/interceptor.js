@@ -1,9 +1,23 @@
 import apiClient from './axios'
 import { STORAGE_KEYS } from '@/constants/storage'
+import { emitSessionExpired } from '@/api/sessionEvents'
 
-let isRefreshing = false
-let failedQueue = []
-let refreshTimeoutId = null
+const REFRESH_TIMEOUT_MS = 20000
+const DEFAULT_MIN_REMAINING_MS = 60 * 1000
+const DEBUG = true
+
+let refreshInFlight = null
+
+function log(...args) {
+  if (DEBUG && typeof window !== 'undefined') {
+    console.log('[Interceptor]', ...args)
+  }
+}
+
+function maskToken(token) {
+  if (!token) return 'none'
+  return `${token.slice(0, 8)}...${token.slice(-4)}`
+}
 
 function getAccessToken() {
   if (typeof window === 'undefined') return null
@@ -27,17 +41,6 @@ function redirectToLogin() {
   window.location.href = '/'
 }
 
-function processQueue(error, token = null) {
-  failedQueue.forEach(prom => {
-    if (error) {
-      prom.reject(error)
-    } else {
-      prom.resolve(token)
-    }
-  })
-  failedQueue = []
-}
-
 function isNetworkError(error) {
   if (!error) return false
   if (error.code === 'ECONNABORTED') return true
@@ -51,103 +54,32 @@ function isNetworkError(error) {
   return false
 }
 
-async function attemptTokenRefresh() {
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) {
-    throw new Error('No refresh token available')
-  }
-
-  // Create a separate axios instance for refresh to avoid interceptor loops
-  const { default: axios } = await import('axios')
-  const refreshClient = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || '',
-    timeout: 15000,
-    headers: { 'Content-Type': 'application/json' },
-  })
-
+function getTokenExpiryMs(token) {
+  if (!token || token.split('.').length !== 3) return null
   try {
-    const response = await refreshClient.post('/auth/refresh-token', { refreshToken })
-    const { accessToken, refreshToken: newRefreshToken } = response.data
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken)
-      if (newRefreshToken) {
-        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken)
-      }
-    }
-
-    return accessToken
-  } catch (error) {
-    clearStorage()
-    throw error
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(decodeURIComponent(
+      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    ))
+    return payload?.exp ? payload.exp * 1000 : null
+  } catch {
+    return null
   }
 }
 
-export function setupInterceptors() {
-  apiClient.interceptors.request.use(
-    (config) => {
-      const token = getAccessToken()
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-      }
-      return config
-    },
-    (error) => Promise.reject(error)
-  )
+function isTokenNearExpiry(token, minRemainingMs) {
+  const expiryMs = getTokenExpiryMs(token)
+  if (expiryMs == null) return false
+  return expiryMs - Date.now() < minRemainingMs
+}
 
-  apiClient.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const originalRequest = error.config
-
-      // Don't retry auth endpoints
-      if (originalRequest.url?.includes('/auth/')) {
-        return Promise.reject(normalizeError(error))
-      }
-
-      // Handle network errors - don't logout, just reject with normalized error
-      if (isNetworkError(error)) {
-        console.log('[Auth] Network error detected, not logging out:', error.message)
-        return Promise.reject(normalizeError(error))
-      }
-
-      // Handle 401 - token expired, try to refresh
-      if (error.response?.status === 401 && !originalRequest._retry) {
-        // If already refreshing, queue this request
-        if (isRefreshing) {
-          return new Promise((resolve, reject) => {
-            failedQueue.push({ resolve, reject })
-          })
-            .then(token => {
-              originalRequest.headers.Authorization = `Bearer ${token}`
-              return apiClient(originalRequest)
-            })
-            .catch(err => Promise.reject(normalizeError(err)))
-        }
-
-        originalRequest._retry = true
-        isRefreshing = true
-
-        try {
-          const newAccessToken = await attemptTokenRefresh()
-          processQueue(null, newAccessToken)
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-          return apiClient(originalRequest)
-        } catch (refreshError) {
-          // Refresh failed - clear storage but DON'T redirect automatically
-          // Let the query fail naturally so React Query can handle it
-          processQueue(refreshError, null)
-          clearStorage()
-          // Don't redirect here - let the app handle auth state
-          return Promise.reject(normalizeError(refreshError))
-        } finally {
-          isRefreshing = false
-        }
-      }
-
-      return Promise.reject(normalizeError(error))
-    }
-  )
+function setTokens(accessToken, refreshToken) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken)
+  if (refreshToken) {
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken)
+  }
 }
 
 function normalizeError(error) {
@@ -158,7 +90,7 @@ function normalizeError(error) {
     normalized.userMessage = 'No internet connection. Please check your network and try again.'
   } else if (error.response?.status === 401) {
     normalized.isAuthError = true
-    normalized.userMessage = error.response?.data?.message || 'Your session has expired. Please log in again.'
+    normalized.userMessage = error.response?.data?.message || 'Unauthorized. Please log in again.'
   } else if (error.response?.status === 400) {
     normalized.isValidationError = true
     normalized.userMessage = error.response?.data?.message || 'Invalid request. Please check your input.'
@@ -181,8 +113,152 @@ function normalizeError(error) {
   return normalized
 }
 
+async function performRefresh() {
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) {
+    const err = new Error('No refresh token available')
+    err.isNoSession = true
+    throw err
+  }
+
+  const { default: axios } = await import('axios')
+  const refreshClient = axios.create({
+    baseURL: process.env.NEXT_PUBLIC_API_URL || '',
+    timeout: 15000,
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  let response
+  try {
+    response = await refreshClient.post('/auth/refresh-token', { refreshToken })
+  } catch (error) {
+    const status = error.response?.status
+    const isGenuineExpiry = status === 401 || status === 403
+    if (isGenuineExpiry) {
+      clearStorage()
+      emitSessionExpired('refresh-rejected')
+      const authErr = new Error('Your session has expired. Please log in again.')
+      authErr.isAuthError = true
+      authErr.userMessage = authErr.message
+      throw authErr
+    }
+    const transientErr = normalizeError(error)
+    transientErr.isRefreshTransient = true
+    throw transientErr
+  }
+
+  const { accessToken, refreshToken: newRefreshToken } = response.data || {}
+  if (!accessToken) {
+    throw new Error('Refresh response did not include an access token')
+  }
+
+  setTokens(accessToken, newRefreshToken || refreshToken)
+  return accessToken
+}
+
+function refreshWithWatchdog() {
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => {
+      const err = { message: 'Refresh request timed out. Please try again.' }
+      err.isRefreshTransient = true
+      err.isTimeout = true
+      reject(err)
+    }, REFRESH_TIMEOUT_MS)
+  })
+  return Promise.race([performRefresh(), timeout])
+}
+
+export function ensureFreshAccessToken({ minRemainingMs = DEFAULT_MIN_REMAINING_MS } = {}) {
+  const accessToken = getAccessToken()
+  if (accessToken && !isTokenNearExpiry(accessToken, minRemainingMs)) {
+    return Promise.resolve(accessToken)
+  }
+
+  if (!refreshInFlight) {
+    refreshInFlight = refreshWithWatchdog().finally(() => {
+      refreshInFlight = null
+    })
+  }
+
+  return refreshInFlight
+}
+
 export function refreshAccessToken() {
-  return attemptTokenRefresh()
+  return ensureFreshAccessToken({ minRemainingMs: 0 })
+}
+
+export function setupInterceptors() {
+  apiClient.interceptors.request.use(
+    (config) => {
+      const token = getAccessToken()
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      log('Request:', config.method?.toUpperCase(), config.url, { token: maskToken(token) })
+      return config
+    },
+    (error) => Promise.reject(error)
+  )
+
+  apiClient.interceptors.response.use(
+    (response) => {
+      log('Response:', response.config?.method?.toUpperCase(), response.config?.url, { status: response.status })
+      return response
+    },
+    async (error) => {
+      const originalRequest = error.config
+      log('Response error:', originalRequest?.method?.toUpperCase(), originalRequest?.url, {
+        status: error.response?.status,
+        network: isNetworkError(error),
+        message: error.message,
+      })
+
+      if (!originalRequest) {
+        return Promise.reject(normalizeError(error))
+      }
+
+      const isLoginUrl = originalRequest.url === '/auth/admin/login' || originalRequest.url?.endsWith('/login')
+      const isRefreshUrl = originalRequest.url?.includes('/refresh-token')
+
+      if (isLoginUrl || isRefreshUrl) {
+        return Promise.reject(normalizeError(error))
+      }
+
+      if (isNetworkError(error)) {
+        return Promise.reject(normalizeError(error))
+      }
+
+      if (error.response?.status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true
+        log('401 detected, refreshing access token')
+        try {
+          const token = await ensureFreshAccessToken()
+          log('Token refreshed, retrying request:', originalRequest.url, { token: maskToken(token) })
+          const retryConfig = {
+            ...originalRequest,
+            headers: { ...originalRequest.headers },
+          }
+          retryConfig.headers.Authorization = `Bearer ${token}`
+          return apiClient(retryConfig)
+        } catch (refreshError) {
+          log('Refresh failed:', refreshError.message)
+          return Promise.reject(normalizeError(refreshError))
+        }
+      }
+
+      if (error.response?.status === 401) {
+        log('Session invalid after refresh, emitting session-expired')
+        clearStorage()
+        emitSessionExpired('invalid-token')
+        const authErr = new Error('Your session has expired. Please log in again.')
+        authErr.isAuthError = true
+        authErr.userMessage = authErr.message
+        return Promise.reject(authErr)
+      }
+
+      return Promise.reject(normalizeError(error))
+    }
+  )
 }
 
 export { getAccessToken, getRefreshToken, clearStorage, redirectToLogin }

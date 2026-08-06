@@ -1,22 +1,26 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
-import { getAccessToken, getRefreshToken, refreshAccessToken } from '@/api/interceptor'
+import { getAccessToken, getRefreshToken, ensureFreshAccessToken } from '@/api/interceptor'
+
+const REFRESH_THRESHOLD_MS = 5 * 60 * 1000
+const CHECK_INTERVAL_MS = 2 * 60 * 1000
+
+function tokenExpiryMs(token) {
+  if (!token || token.split('.').length !== 3) return null
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(decodeURIComponent(
+      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    ))
+    return payload?.exp ? payload.exp * 1000 : null
+  } catch {
+    return null
+  }
+}
 
 export function useProactiveTokenRefresh() {
-  const parseJwt = useCallback((token) => {
-    try {
-      const base64Url = token.split('.')[1]
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-      const jsonPayload = decodeURIComponent(
-        atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
-      )
-      return JSON.parse(jsonPayload)
-    } catch {
-      return null
-    }
-  }, [])
-
   const checkAndRefreshToken = useCallback(async () => {
     const accessToken = getAccessToken()
     const refreshToken = getRefreshToken()
@@ -25,45 +29,45 @@ export function useProactiveTokenRefresh() {
       return
     }
 
-    const payload = parseJwt(accessToken)
-    if (!payload?.exp) {
+    const expiryMs = tokenExpiryMs(accessToken)
+    if (expiryMs == null) {
       return
     }
 
-    const expiryTime = payload.exp * 1000
-    const now = Date.now()
-    const timeUntilExpiry = expiryTime - now
+    const timeUntilExpiry = expiryMs - Date.now()
 
-    // Refresh if token expires within 5 minutes
-    const refreshThreshold = 5 * 60 * 1000
-
-    if (timeUntilExpiry < refreshThreshold && timeUntilExpiry > 0) {
+    if (timeUntilExpiry < REFRESH_THRESHOLD_MS) {
       console.log('[ProactiveRefresh] Token expiring soon, refreshing...')
       try {
-        await refreshAccessToken()
+        await ensureFreshAccessToken({ minRemainingMs: REFRESH_THRESHOLD_MS })
         console.log('[ProactiveRefresh] Token refreshed successfully')
       } catch (error) {
         console.log('[ProactiveRefresh] Token refresh failed:', error.message)
       }
     }
-  }, [parseJwt])
+  }, [])
 
   useEffect(() => {
-    // Initial check
     checkAndRefreshToken()
 
-    // Check every 2 minutes
     const interval = setInterval(() => {
       checkAndRefreshToken()
-    }, 2 * 60 * 1000)
+    }, CHECK_INTERVAL_MS)
 
-    // Also check on focus
     const handleFocus = () => checkAndRefreshToken()
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndRefreshToken()
+      }
+    }
+
     window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
       clearInterval(interval)
       window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [checkAndRefreshToken])
 }

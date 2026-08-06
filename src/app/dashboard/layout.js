@@ -6,9 +6,11 @@ import {
   Droplets, LayoutDashboard, Search, Bell, ChevronDown,
   Menu, LogOut, Settings, CreditCard, Shield, Megaphone, Bug
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import Avatar from '@/components/ui/Avatar'
 import useAuthStore from '@/store/authStore'
 import { ProactiveTokenRefresher } from '@/hooks/useProactiveTokenRefresh'
+import { onSessionExpired } from '@/api/sessionEvents'
 
 const sidebarItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -39,20 +41,39 @@ export default function DashboardLayout({ children }) {
     }
   }, [_hydrated, isAuthenticated, router])
 
-  // Handle focus events to re-check auth state
+  // Show a friendly message and redirect when the session genuinely expires
+  useEffect(() => {
+    const unsub = onSessionExpired(() => {
+      console.log('[DashboardLayout] Session expired - logging out with message')
+      toast.error('Your session has expired. Please log in again.', { duration: 6000 })
+      clearAuth('session-expired')
+      router.push('/')
+    })
+    return unsub
+  }, [clearAuth, router])
+
+  // Re-validate auth when the tab regains focus or tokens change in another tab
   useEffect(() => {
     const handleFocus = () => {
-      if (_hydrated && !isAuthenticated) {
-        console.log('[DashboardLayout] Focus detected, re-checking auth')
+      console.log('[DashboardLayout] Focus detected, re-validating auth')
+      hydrate()
+    }
+    const handleStorage = (event) => {
+      if (event.key === 'accessToken' || event.key === 'refreshToken' || event.key === 'user') {
+        console.log('[DashboardLayout] Token storage changed, re-validating auth')
         hydrate()
       }
     }
     window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [_hydrated, isAuthenticated, hydrate])
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [hydrate])
 
   const handleLogout = useCallback(() => {
-    clearAuth()
+    clearAuth('manual')
     router.push('/')
   }, [clearAuth, router])
 
